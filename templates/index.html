@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR & LLM Inference</title>
+</head>
+<body>
+    <h2>Upload an Image for OCR Processing</h2>
+    
+    <form action="/inference" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" required>
+        <button type="submit">Submit</button>
+    </form>
+
+    {% if response %}
+        <h3>Extracted Text & Analysis:</h3>
+        <p>{{ response }}</p>
+    {% endif %}
+</body>
+</html>
