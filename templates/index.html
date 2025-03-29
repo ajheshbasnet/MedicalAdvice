@@ -4,18 +4,118 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OCR & LLM Inference</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+            max-width: 70%;
+            min-width: 450px;
+            text-align: center;
+        }
+        h2 {
+            color: #333;
+        }
+        input {
+            width: 97%;
+            padding: 8px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background-color: black;
+            color: white;
+            border: 1px;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 50%;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .response {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e9f5e9;
+            border-left: 5px solid #28a745;
+            border-radius: 5px;
+            text-align: left;
+            font-family: monospace;
+            font-size: 16px;
+            width: 95%;
+            overflow-x: auto; 
+            white-space: pre-wrap; 
+            word-wrap: break-word; 
+        }
+        .loading {
+            color: #d39e00;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
-    <h2>Upload an Image for OCR Processing</h2>
-    
-    <form action="/inference" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" required>
-        <button type="submit">Submit</button>
-    </form>
 
-    {% if response %}
-        <h3>Extracted Text & Analysis:</h3>
-        <p>{{ response }}</p>
-    {% endif %}
+    <div class="container">
+        <h2>Upload an Image</h2>
+        
+        <form id="uploadForm" enctype="multipart/form-data">
+            <input type="file" id="fileInput" name="file" required>
+            <button type="button" onclick="uploadFile()">Submit</button>
+        </form>
+
+        <p id="loadingMessage" class="loading" style="display: none;">⏳ Please wait, your document is being read...</p>
+        
+        <!-- Using <pre> instead of <div> to maintain structured text format -->
+        <pre class="response" id="responseBox"></pre>
+    </div>
+
+    <script>
+        async function uploadFile() {
+            let formData = new FormData();
+            let fileInput = document.getElementById("fileInput").files[0];
+
+            if (!fileInput) {
+                alert("Please select a file to upload.");
+                return;
+            }
+
+            formData.append("file", fileInput);
+            
+            // Show loading message
+            document.getElementById("loadingMessage").style.display = "block";
+            document.getElementById("responseBox").textContent = ""; // Clear previous response
+
+            try {
+                let response = await fetch("/inference", {
+                    method: "POST",
+                    body: formData
+                });
+
+                let result = await response.json();
+                document.getElementById("responseBox").textContent = result.response; // Use textContent to preserve formatting
+            } catch (error) {
+                alert("Error processing the image.");
+                console.error(error);
+            } finally {
+                // Hide loading message
+                document.getElementById("loadingMessage").style.display = "none";
+            }
+        }
+    </script>
+
 </body>
 </html>
