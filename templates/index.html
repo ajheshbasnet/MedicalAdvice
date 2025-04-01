@@ -3,117 +3,248 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OCR & LLM Inference</title>
+    <title>Medicine OCR & Analysis</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f4f4;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
             margin: 0;
+            padding: 20px;
         }
         .container {
+            max-width: 800px;
+            margin: 0 auto;
             background: white;
-            padding: 20px;
+            padding: 30px;
             border-radius: 10px;
-            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
-            max-width: 70%;
-            min-width: 450px;
-            text-align: center;
+            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
         }
         h2 {
             color: #333;
+            margin-bottom: 20px;
+            text-align: center;
         }
-        input {
-            width: 97%;
-            padding: 8px;
-            margin: 10px 0;
-            border: 1px solid #ccc;
+        .upload-section {
+            text-align: center;
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .file-input-container {
+            position: relative;
+            margin: 20px 0;
+        }
+        .file-input-label {
+            display: inline-block;
+            padding: 12px 20px;
+            background-color: #f0f0f0;
+            color: #333;
             border-radius: 5px;
+            cursor: pointer;
+            width: 80%;
+            margin: 0 auto;
+            border: 1px dashed #ccc;
+        }
+        .file-input-label:hover {
+            background-color: #e0e0e0;
+        }
+        #fileInput {
+            position: absolute;
+            left: -9999px;
+        }
+        #fileName {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
         }
         button {
-            background-color: black;
+            background-color: #000;
             color: white;
-            border: 1px;
-            padding: 10px;
+            border: none;
+            padding: 12px 20px;
             border-radius: 5px;
             cursor: pointer;
             font-size: 16px;
             width: 50%;
+            transition: background-color 0.3s;
+            margin-top: 10px;
         }
         button:hover {
             background-color: #218838;
         }
-        .response {
-            margin-top: 20px;
-            padding: 15px;
-            background: #e9f5e9;
-            border-left: 5px solid #28a745;
-            border-radius: 5px;
-            text-align: left;
-            font-family: monospace;
-            font-size: 16px;
-            width: 95%;
-            overflow-x: auto; 
-            white-space: pre-wrap; 
-            word-wrap: break-word; 
-        }
         .loading {
-            color: #d39e00;
+            display: none;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error-message {
+            color: #d9534f;
+            display: none;
+            margin: 10px 0;
+            text-align: center;
+        }
+        .results-section {
+            display: none;
+            margin-top: 30px;
+        }
+        .section {
+            margin: 25px 0;
+        }
+        .section-title {
+            font-size: 18px;
             font-weight: bold;
-            margin-top: 10px;
+            margin-bottom: 10px;
+            color: #0056b3;
+        }
+        .response-box {
+            background: #f9f9f9;
+            border-left: 5px solid #28a745;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            line-height: 1.5;
+            overflow-x: auto;
+        }
+        .reset-button {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .disclaimer {
+            font-size: 12px;
+            color: #777;
+            margin-top: 30px;
+            text-align: center;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>Upload an Image</h2>
+        <h2>Medicine OCR & Health Analysis</h2>
         
-        <form id="uploadForm" enctype="multipart/form-data">
-            <input type="file" id="fileInput" name="file" required>
-            <button type="button" onclick="uploadFile()">Submit</button>
-        </form>
+        <div id="uploadSection" class="upload-section">
+            <p>Upload an image of your medicine prescription for AI analysis</p>
+            
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="file-input-container">
+                    <label for="fileInput" class="file-input-label">
+                        Choose an image
+                    </label>
+                    <input type="file" id="fileInput" name="file" accept="image/*" required>
+                    <div id="fileName"></div>
+                </div>
+                <button type="button" onclick="uploadFile()">Analyze Prescription</button>
+            </form>
+        </div>
 
-        <p id="loadingMessage" class="loading" style="display: none;">⏳ Please wait, your document is being read...</p>
+        <div id="loadingSection" class="loading">
+            <div class="spinner"></div>
+            <p>Processing your image...</p>
+        </div>
         
-        <!-- Using <pre> instead of <div> to maintain structured text format -->
-        <pre class="response" id="responseBox"></pre>
+        <div id="errorMessage" class="error-message">
+            An error occurred. Please try again.
+        </div>
+        
+        <div id="resultsSection" class="results-section">
+            
+            <div class="section">
+                <div class="section-title">AI Analysis</div>
+                <div id="responseBox" class="response-box"></div>
+            </div>
+            
+            <div class="reset-button">
+                <button onclick="resetPage()">Analyze Another Prescription</button>
+            </div>
+        </div>
+        
+        <div class="disclaimer">
+            Note: This analysis is provided for informational purposes only. 
+            Always consult with a healthcare professional for medical advice.
+        </div>
     </div>
 
     <script>
-        async function uploadFile() {
-            let formData = new FormData();
-            let fileInput = document.getElementById("fileInput").files[0];
+        // Show file name when selected
+        document.getElementById('fileInput').addEventListener('change', function() {
+            const fileName = this.files[0] ? this.files[0].name : 'No file selected';
+            document.getElementById('fileName').textContent = fileName;
+        });
 
-            if (!fileInput) {
-                alert("Please select a file to upload.");
+        async function uploadFile() {
+            const fileInput = document.getElementById("fileInput");
+            const loadingSection = document.getElementById("loadingSection");
+            const errorMessage = document.getElementById("errorMessage");
+            const uploadSection = document.getElementById("uploadSection");
+            const resultsSection = document.getElementById("resultsSection");
+            
+            // Reset error message
+            errorMessage.style.display = "none";
+            
+            if (!fileInput.files[0]) {
+                alert("Please select an image to upload.");
                 return;
             }
 
-            formData.append("file", fileInput);
+            let formData = new FormData();
+            formData.append("file", fileInput.files[0]);
             
-            // Show loading message
-            document.getElementById("loadingMessage").style.display = "block";
-            document.getElementById("responseBox").textContent = ""; // Clear previous response
+            // Show loading spinner, hide upload section
+            loadingSection.style.display = "block";
+            uploadSection.style.display = "none";
 
             try {
-                let response = await fetch("/inference", {
+                const response = await fetch("/inference", {
                     method: "POST",
                     body: formData
                 });
-
-                let result = await response.json();
-                document.getElementById("responseBox").textContent = result.response; // Use textContent to preserve formatting
+                
+                if (!response.ok) {
+                    throw new Error(`Server returned ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                // Display results
+                document.getElementById("responseBox").textContent = result.response;
+                
+                // Show results section, hide loading
+                resultsSection.style.display = "block";
+                loadingSection.style.display = "none";
+                
             } catch (error) {
-                alert("Error processing the image.");
-                console.error(error);
-            } finally {
-                // Hide loading message
-                document.getElementById("loadingMessage").style.display = "none";
+                console.error("Error:", error);
+                errorMessage.style.display = "block";
+                loadingSection.style.display = "none";
+                uploadSection.style.display = "block";
             }
+        }
+        
+        function resetPage() {
+            // Reset the form
+            document.getElementById("uploadForm").reset();
+            document.getElementById("fileName").textContent = "";
+            
+            // Hide results, show upload section
+            document.getElementById("resultsSection").style.display = "none";
+            document.getElementById("uploadSection").style.display = "block";
+            
+            // Clear previous results
+            document.getElementById("responseBox").textContent = "";
         }
     </script>
 

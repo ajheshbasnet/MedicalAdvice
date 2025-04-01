@@ -1,7 +1,8 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Form
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from llm_integration import LLMProcessor
+import uuid
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -10,8 +11,8 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
 # Define API keys
-MISTRAL_API_KEY = "MistralAPI"
-GENAI_API_KEY = "GEMINIAPI"
+MISTRAL_API_KEY = "5JkLJdGN5zKQP5XsCrwTFj1jT5hIApO8"
+GENAI_API_KEY = "AIzaSyA-jC83f7PZXzP4XeGHO8gbFCo1aIPqeKI"
 
 # Initialize LLM Processor
 llm_processor = LLMProcessor(MISTRAL_API_KEY, GENAI_API_KEY)
@@ -36,25 +37,20 @@ async def ask_llm(file: UploadFile = File(...)):
         # Fix formatting by replacing <br> with new lines
         response_text = response_text.replace("<br>", "\n").replace("**", "")
 
-        return JSONResponse(content={"response": response_text}, status_code=200)
+        return JSONResponse(
+            content={
+                "response": response_text,
+                "extracted_text": extracted_text
+            }, 
+            status_code=200
+        )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/additional_response")
-async def additional_response():
+@app.get("/health")
+async def health_check():
     """
-    Provides an additional structured response based on LLM analysis.
+    Simple health check endpoint.
     """
-    try:
-        additional_info = """
-        Health Suggestions:
-        - Stay hydrated
-        - Maintain a balanced diet
-        - Get regular exercise
-        - Follow your prescribed medications
-        """
-        return JSONResponse(content={"response": additional_info}, status_code=200)
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "OK"}

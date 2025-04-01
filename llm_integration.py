@@ -4,50 +4,63 @@ import numpy as np
 from PIL import Image
 from mistralai import Mistral
 import google.generativeai as genai
-import io
+import io, os
 import re
 
 class LLMProcessor:
     def __init__(self, mistral_api_key: str, genai_api_key: str):
         self.mistral_client = Mistral(api_key=mistral_api_key)
         genai.configure(api_key=genai_api_key)
-        self.genai_model = genai.GenerativeModel('gemini-2.0-flash')
+        self.genai_model = genai.GenerativeModel('gemini-2.5-pro-exp-03-25')
 
-    def preprocess_image(self, image_bytes: bytes) -> str:
-        # Convert bytes to a NumPy array
-        image_array = np.frombuffer(image_bytes, dtype=np.uint8)
-        # Decode the image
-        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
-
+    def preprocess_image(self, image_bytes):
+        """Process image bytes and return base64 encoded string"""
+        # Convert bytes to numpy array
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
         # Convert to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        # Apply Gaussian blur to reduce noise
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        # Apply adaptive thresholding
-        thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                       cv2.THRESH_BINARY, 11, 2)
-        # Denoising using morphological transformations
-        kernel = np.ones((1, 1), np.uint8)
-        denoised = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
 
-        # Deskewing the image
-        coords = np.column_stack(np.where(denoised > 0))
-        angle = cv2.minAreaRect(coords)[-1]
-        if angle < -45:
-            angle = 90 + angle
-        elif angle > 45:
-            angle = angle - 90
-        else:
-            angle = angle * -1
+        # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        enhanced = clahe.apply(gray)
 
-        (h, w) = denoised.shape[:2]
-        center = (w // 2, h // 2)
-        M = cv2.getRotationMatrix2D(center, angle, 1.0)
-        deskewed = cv2.warpAffine(denoised, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+        # Reduce noise while keeping edges
+        denoised = cv2.bilateralFilter(enhanced, 9, 75, 75)
 
-        # Encode the processed image to base64
-        _, buffer = cv2.imencode('.jpg', deskewed)
+        # Adaptive Thresholding for binarization
+        binary = cv2.adaptiveThreshold(denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                    cv2.THRESH_BINARY, 15, 8)
+
+        # Additional Denoising using Non-Local Means
+        binary = cv2.fastNlMeansDenoising(binary, None, 30, 7, 21)
+
+        # Invert colors (OCR works better with black text on white)
+        inverted = cv2.bitwise_not(binary)
+
+        # Deskewing to straighten text
+        def deskew(img):
+            coords = np.column_stack(np.where(img > 0))
+            angle = cv2.minAreaRect(coords)[-1]
+            if angle < -45:
+                angle = -(90 + angle)
+            else:
+                angle = -angle
+            (h, w) = img.shape[:2]
+            center = (w // 2, h // 2)
+            M = cv2.getRotationMatrix2D(center, angle, 1.0)
+            return cv2.warpAffine(img, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+
+        deskewed = deskew(inverted)
+
+        # Resize image for better text recognition
+        resized = cv2.resize(deskewed, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+
+        # Convert processed image to base64
+        _, buffer = cv2.imencode('.jpg', resized)
         base64_image = base64.b64encode(buffer).decode('utf-8')
+        
         return base64_image
 
     def extract_text_from_image(self, base64_image: str) -> str:
@@ -69,14 +82,25 @@ class LLMProcessor:
 
     def generate_response(self, cleaned_text: str) -> str:
         input_prompt = (
-            f"{cleaned_text} I have a list of medicines along with their dosages. "
-            "Based on these medicines, analyze what possible health issues I might be facing. "
-            "Additionally, identify which aspects of my health I should focus on the most. "
-            "Furthermore, suggest natural home remedies that can complement my prescribed medicines."
-            "Provide details on their effectiveness, how to use them, and any precautions I should take. and dont give too much large output texts. give around 500 words. "
-            "If the condition is serious, recommend consulting a doctor. "
-            "Please ensure the response is detailed, structured, and informative. "
-            "Conclude with a positive message like 'Get well soon' or 'Have a good day'."
+            f'''{cleaned_text}:
+            Behave like Expert... I have a list of medicines along with their dosages. Extract only the medicine names and their corresponding dosages (if provided).
+
+            Additional Instructions:
+            Health Analysis: Based on the medicines, identify the possible health conditions I might be facing.
+
+            Health Focus: Point out the most important areas of my health that need attention.
+
+            Natural Remedies: Suggest simple home remedies that can help alongside my medications.
+
+            Mention how to use them and any important precautions.
+
+            If my condition seems serious, clearly say: "If your condition is serious, please visit a doctor immediately."
+
+            Keep It Short and Practical: Don't explain too much. Just give it in short, clear sentences—not too little, just enough to understand.
+
+            Closing Note: End with a positive message like "Get well soon!" or "Have a great day!"
+
+            Keep it structured, informative, and easy to read. '''
         )
         response = self.genai_model.generate_content(input_prompt)
         return response.text
