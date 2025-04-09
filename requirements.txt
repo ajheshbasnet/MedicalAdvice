@@ -1,3 +1,5 @@
 mistralai
 opencv-python
 numpy
+fastapi
+pandas
