@@ -1,8 +1,9 @@
-mistralai
+fastapi
+uvicorn
+jinja2
 opencv-python
 numpy
-fastapi
-pandas
-google-generativeai
 Pillow
-uvicorn
+mistralai
+google-generativeai
+python-multipart
